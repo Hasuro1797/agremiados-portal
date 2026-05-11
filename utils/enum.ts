@@ -1,0 +1,75 @@
+export enum ActivityType {
+  ACADEMIC = "ACADEMIC",
+  SOCIAL = "SOCIAL",
+}
+
+export enum PostType {
+  COMMUNICATIONS = "COMMUNICATIONS",
+  NEWS = "NEWS",
+}
+
+export enum RequestSource {
+  ECOMMERCE = "ECOMMERCE",
+  REFUND = "REFUND",
+  RECURRENCE = "RECURRENCE",
+}
+
+export enum PaymentType {
+  SOCIAL = "SOCIAL",
+  ACADEMIC = "ACADEMIC",
+  RESERVATION = "RESERVATION",
+  CURRENCY = "CURRENCY",
+  QUOTE = "QUOTE",
+}
+
+export enum PeopleAvailable {
+  TODOS = "TODOS",
+  HABILES = "HABILES",
+  HABILES_AL_DIA = "HABILES_AL_DIA",
+}
+
+export enum UserStatus {
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
+  SUSPENDED = "SUSPENDED",
+  BLOCKED = "BLOCKED",
+}
+
+export enum UserRoles {
+  SUPERADMIN = "SUPERADMIN",
+  ADMIN = "ADMIN",
+  TREASURER = "TREASURER",
+  EVENT_MANAGER = "EVENT_MANAGER",
+  CONTENT_EDITOR = "CONTENT_EDITOR",
+  SUPPORT_AGENT = "SUPPORT_AGENT",
+  SECRETARY = "SECRETARY",
+  MODERATOR = "MODERATOR",
+  MEMBER = "MEMBER",
+}
+
+export enum AgreementCategory {
+  EDUCATION = "EDUCATION",
+  HEALTH = "HEALTH",
+  COMMERCIAL = "COMMERCIAL",
+  FINANCIAL = "FINANCIAL",
+  GOVERNMENT = "GOVERNMENT",
+  OTHER = "OTHER",
+}
+
+export enum AgreementStatus {
+  ACTIVE = "ACTIVE",
+  DRAFT = "DRAFT",
+}
+
+export enum SurveyStatus {
+  DRAFT = "DRAFT",
+  ACTIVE = "ACTIVE",
+  CLOSED = "CLOSED",
+}
+
+export enum QuestionType {
+  SINGLE_CHOICE = "SINGLE_CHOICE",
+  MULTIPLE_CHOICE = "MULTIPLE_CHOICE",
+  TEXT = "TEXT",
+  SCALE = "SCALE",
+}

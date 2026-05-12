@@ -22,12 +22,13 @@ import { CheckoutLayout } from "./checkout/CheckoutLayout";
 import { ProgressBar } from "./checkout/ProgressBar";
 import StepBillingInfo from "./checkout/StepBillingInfo";
 import StepPaymentConfig from "./checkout/stepPaymentConfig";
-import { GET_ACADEMIC_ACTIVITY_BY_ID } from "@/graphql/query/acedemic.query";
-import { GET_SOCIAL_ACTIVITY_BY_ID } from "@/graphql/query/social.query";
+// import { GET_ACADEMIC_ACTIVITY_BY_ID } from "@/graphql/query/acedemic.query";
+// import { GET_SOCIAL_ACTIVITY_BY_ID } from "@/graphql/query/social.query";
 import StepPaymentResult from "./checkout/stepPaymentResult";
 import { GET_RESERVATION_BY_ID } from "@/graphql/query/agreement.query";
 import StepReservationConfig from "./checkout/StepReservationConfig";
 import { useUserStore } from "@/providers/user-provider";
+import { GET_ACTIVITY_BY_ID } from "@/graphql/query/activity.query";
 
 interface CheckoutDetailProps {
   methodType: string;
@@ -164,11 +165,11 @@ export default function CheckoutDetail({ methodType }: CheckoutDetailProps) {
   });
 
   const [academicEvents, { loading: academicLoading, error: academicError }] =
-    useLazyQuery(GET_ACADEMIC_ACTIVITY_BY_ID, {
+    useLazyQuery(GET_ACTIVITY_BY_ID, {
       fetchPolicy: "no-cache",
     });
   const [socialEvents, { loading: socialLoading, error: socialError }] =
-    useLazyQuery(GET_SOCIAL_ACTIVITY_BY_ID, {
+    useLazyQuery(GET_ACTIVITY_BY_ID, {
       fetchPolicy: "no-cache",
     });
 

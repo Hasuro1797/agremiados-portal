@@ -52,7 +52,7 @@ export default function QuickAccessGrid() {
       label: "Convenios",
       description: "Descuentos y beneficios exclusivos",
       icon: Handshake,
-      href: routes.agreements,
+      href: routes.agreements.home,
       iconClass: "text-violet-600",
       bgClass: "bg-violet-50",
       accentClass: "group-hover:bg-violet-50/50 group-hover:border-violet-200",

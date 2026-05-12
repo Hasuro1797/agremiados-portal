@@ -94,7 +94,7 @@ export default function AgreementDetailComponent({
               No se pudo cargar el convenio.
             </p>
             <Link
-              href={routes.agreements}
+              href={routes.agreements.home}
               className="mt-4 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
             >
               <ArrowLeft className="size-4" /> Volver a Convenios
@@ -129,7 +129,7 @@ export default function AgreementDetailComponent({
                 </Link>
                 <span>/</span>
                 <Link
-                  href={routes.agreements}
+                  href={routes.agreements.home}
                   className="hover:text-white transition-colors"
                 >
                   Convenios

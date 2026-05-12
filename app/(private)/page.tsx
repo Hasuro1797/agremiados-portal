@@ -1,6 +1,6 @@
 "use client";
 import ActivitiesSection from "@/components/home/ActivitiesSection";
-import CertificateSection from "@/components/home/CertificateSection";
+// import CertificateSection from "@/components/home/CertificateSection";
 import HeroBanner from "@/components/home/HeroBanner";
 import HomeNavbar from "@/components/home/HomeNavbar";
 import InfoSection from "@/components/home/InfoSection";
@@ -64,7 +64,7 @@ export default function Home() {
             <QuickAccessGrid />
             <ActivitiesSection />
             <InfoSection />
-            <CertificateSection />
+            {/* <CertificateSection /> */}
           </main>
         </div>
       </div>

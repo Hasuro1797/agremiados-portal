@@ -79,31 +79,12 @@ export const availableFormSchema = object({
 
 export type FormAvailableSchema = z.infer<typeof availableFormSchema>;
 
-export const opinionValues = z.object({
-  place: z.string().min(2, {
-    message: "El lugar debe tener al menos 2 caracteres",
-  }),
-  topic: z.string().min(2, {
-    message: "El tema debe tener al menos 2 caracteres",
-  }),
-  details: z.string().min(2, {
-    message: "Los detalles deben tener al menos 2 caracteres",
-  }),
-  comment: z.string().optional(),
-  worker: z.string().optional(),
-  workerName: z.string().optional(),
-});
-
-export type FormOpinionValues = z.infer<typeof opinionValues>;
-
-// ── Reservation request form ───────────────────────────────────────────────
+// Reservation request form
 export const reservationRequestSchema = z
   .object({
-    eventName: z
-      .string()
-      .min(2, {
-        message: "El nombre del evento debe tener al menos 2 caracteres",
-      }),
+    eventName: z.string().min(2, {
+      message: "El nombre del evento debe tener al menos 2 caracteres",
+    }),
     purpose: z.string().optional(),
     guestCount: z
       .number({ invalid_type_error: "Ingrese un número válido" })

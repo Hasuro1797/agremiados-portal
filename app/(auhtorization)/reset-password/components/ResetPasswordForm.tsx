@@ -30,6 +30,7 @@ export default function ResetPasswordForm({ token }: { token?: string }) {
   });
 
   const onSubmit = async (_values: FormResetPasswordValues) => {
+    console.log("Submitting new password with token:", _values);
     setLoading(true);
     // TODO: connect RESET_PASSWORD_MUTATION with token
     await new Promise((resolve) => setTimeout(resolve, 1200));
@@ -42,7 +43,9 @@ export default function ResetPasswordForm({ token }: { token?: string }) {
       <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-4 duration-500 text-center space-y-6">
         <div>
           <Logo className="mx-auto" width={72} height={72} />
-          <p className="mt-4 font-semibold text-primary text-lg">Enlace inválido</p>
+          <p className="mt-4 font-semibold text-primary text-lg">
+            Enlace inválido
+          </p>
           <p className="text-sm text-gray-500 mt-1">
             El enlace de recuperación no es válido o ha expirado.
           </p>
@@ -61,7 +64,9 @@ export default function ResetPasswordForm({ token }: { token?: string }) {
       {/* Header */}
       <div className="text-center mb-8">
         <Logo className="mx-auto" width={72} height={72} />
-        <h2 className="mt-4 text-2xl font-bold text-primary">Nueva Contraseña</h2>
+        <h2 className="mt-4 text-2xl font-bold text-primary">
+          Nueva Contraseña
+        </h2>
         <p className="mt-1 text-sm text-gray-500">
           Cree una contraseña segura para su cuenta
         </p>
@@ -75,7 +80,9 @@ export default function ResetPasswordForm({ token }: { token?: string }) {
               <CheckCircle2 className="size-7 text-green-600" />
             </div>
             <div>
-              <p className="font-semibold text-primary">Contraseña actualizada</p>
+              <p className="font-semibold text-primary">
+                Contraseña actualizada
+              </p>
               <p className="text-sm text-gray-500 mt-1 max-w-xs">
                 Su contraseña ha sido restablecida correctamente. Ya puede
                 iniciar sesión con sus nuevas credenciales.
@@ -114,7 +121,11 @@ export default function ResetPasswordForm({ token }: { token?: string }) {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute size-8 flex justify-center items-center right-1 top-1/2 -translate-y-1/2 rounded-md text-gray-400 hover:text-primary hover:bg-gray-100 transition-all duration-150"
                       >
-                        {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                        {showPassword ? (
+                          <Eye className="size-4" />
+                        ) : (
+                          <EyeOff className="size-4" />
+                        )}
                       </button>
                     </div>
                   </FormControl>
@@ -145,7 +156,11 @@ export default function ResetPasswordForm({ token }: { token?: string }) {
                         onClick={() => setShowConfirm(!showConfirm)}
                         className="absolute size-8 flex justify-center items-center right-1 top-1/2 -translate-y-1/2 rounded-md text-gray-400 hover:text-primary hover:bg-gray-100 transition-all duration-150"
                       >
-                        {showConfirm ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                        {showConfirm ? (
+                          <Eye className="size-4" />
+                        ) : (
+                          <EyeOff className="size-4" />
+                        )}
                       </button>
                     </div>
                   </FormControl>

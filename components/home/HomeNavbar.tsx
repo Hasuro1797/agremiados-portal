@@ -41,7 +41,7 @@ export default function HomeNavbar() {
     },
     {
       label: "Convenios",
-      href: routes.agreements,
+      href: routes.agreements.home,
       show: !!organization?.moduleAgreements,
     },
     {
@@ -84,11 +84,11 @@ export default function HomeNavbar() {
 
             {/* Desktop nav */}
             <nav className="hidden lg:flex items-center gap-0.5 flex-1 justify-center">
-              {navItems.map((item) => {
+              {navItems.map((item, index) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link
-                    key={item.href}
+                    key={index}
                     href={item.href}
                     className={cn(
                       "relative px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-150",

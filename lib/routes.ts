@@ -7,12 +7,6 @@ export const routes = {
     resetPassword: "/reset-password",
   },
   checkout: "/checkout",
-  agreements: "/convenios",
-  reservations: "/alquileres",
-  championships: {
-    home: "/campeonatos",
-    fixture: "/campeonatos/calendario",
-  },
   public: {
     termsAndConditions: "/terms-and-conditions",
     privacyPolicy: "/privacy-policy",
@@ -22,14 +16,12 @@ export const routes = {
     downloadCertificate: "/download-certificate",
   },
   schedule: "/calendario",
-  benefits: {
-    home: "/beneficios",
-    agreements: "/beneficios/convenios",
-    reservations: "/beneficios/alquileres",
+  agreements: {
+    home: "/convenios",
+    detail: (id: number | string) => `/convenios/${id}`,
   },
   surveys: {
     home: "/encuestas",
-    survey: "/encuestas/reclamos-quejas-felicitaciones",
     detail: (id: number | string) => `/encuestas/${id}`,
   },
   communications: {
@@ -68,17 +60,19 @@ export const publicRoutes = [
 
 export const privateRoutes = [
   routes.privates.updateData,
-  routes.championships.home,
-  routes.championships.fixture,
   routes.schedule,
-  routes.reservations,
-  routes.agreements,
+  routes.agreements.home,
   routes.surveys.home,
-  routes.surveys.survey,
   routes.communications.home,
   routes.news.home,
   routes.others.home,
   routes.checkout,
   routes.activities.home,
   routes.activities.detail(":id"),
+  routes.spaces.home,
+  routes.spaces.detail(":id"),
+  routes.myReservations,
+  routes.surveys.detail(":id"),
+  routes.communications.detail(":id"),
+  routes.news.detail(":id"),
 ];

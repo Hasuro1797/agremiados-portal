@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { GET_PROFILE_LAWYER } from "@/graphql/query/member.query";
 import { formatDate, formatDateWithOutTime } from "@/lib/utils";
 import {
   AmountForQuote,
@@ -64,6 +63,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cardOrigins, typeOfVoucherPayment } from "@/utils/resources";
+import { GET_PROFILE_MEMBER } from "@/graphql/query/member.query";
 
 interface StepBillingInfoProps {
   billingData: BillingData;
@@ -120,7 +120,7 @@ export default function StepBillingInfo({
     loading: profileLoading,
     data: profileData,
     error: profileError,
-  } = useQuery(GET_PROFILE_LAWYER);
+  } = useQuery(GET_PROFILE_MEMBER);
 
   // Initialize factura fields from profile (only once)
   const profileInitialized = useRef(false);

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useUserStore } from "@/providers/user-provider";
 
 export default function DownloadCertificate() {
-  const { hasAvailable } = useUserStore((state) => state);
+  const { isRegistered } = useUserStore((state) => state);
   const [downloadCertificate, { loading }] = useLazyQuery(
     DOWNLOAD_CERTIFICATE_MUTATION,
     {
@@ -17,7 +17,7 @@ export default function DownloadCertificate() {
   );
 
   const handleDownload = async () => {
-    if (!hasAvailable) {
+    if (!isRegistered) {
       toast.error("No es posible descargar la constancia", {
         description:
           "Por favor regulariza tus pagos para acceder a este beneficio",
@@ -68,7 +68,7 @@ export default function DownloadCertificate() {
         variant="outline"
         className="hover:bg-[#006FFD] text-primary hover:text-blue-100 ease-out duration-300 border-[3px] border-[#006FFD] shadow-xl rounded-lg size-full flex items-center gap-2 px-4 py-2"
         onClick={handleDownload}
-        disabled={loading || !hasAvailable}
+        disabled={loading || !isRegistered}
       >
         {loading && (
           <LoaderCircle

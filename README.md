@@ -121,7 +121,7 @@ portal_agremiado/
 │   ├── DynamicHead.tsx           # <head> con favicon/título dinámicos
 │   ├── AppLoader.tsx             # Splash screen mientras carga la org
 │   ├── Logo.tsx                  # Logo dinámico de la organización
-│   ├── Footer.tsx, Cart.tsx, NotificationBell.tsx, ...
+│   ├── Footer.tsx, NotificationBell.tsx, ...
 │
 ├── graphql/
 │   ├── apollo.client.ts          # Cliente Apollo + auth link + refresh token

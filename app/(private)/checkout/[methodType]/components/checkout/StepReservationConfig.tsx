@@ -1,10 +1,23 @@
 "use client";
-import React, { Dispatch, Fragment, useState } from "react";
-import { BillingData, MethodType, ReservationData } from "../CheckoutDetail";
-import { BillinInfo, Items, OrderPayment } from "@/types/orders.type";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { GET_PROFILE_MEMBER } from "@/graphql/query/member.query";
+import { Items, OrderPayment } from "@/types/orders.type";
+import { PaymentType } from "@/utils/enum";
+import { useQuery } from "@apollo/client";
 import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { get } from "lodash";
 import {
   Building2,
   Calendar,
@@ -21,21 +34,8 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { get } from "lodash";
-import { useQuery } from "@apollo/client";
-import { GET_PROFILE_LAWYER } from "@/graphql/query/member.query";
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { PaymentType } from "@/utils/enum";
+import React, { Dispatch, Fragment, useState } from "react";
+import { BillingData, MethodType, ReservationData } from "../CheckoutDetail";
 
 interface StepReservationConfigProps {
   reservationData: ReservationData;
@@ -54,7 +54,7 @@ export default function StepReservationConfig({
   setBillingData,
   reservationData,
   setReservationData,
-  onNext,
+  // onNext,
   loadingReservation,
   errorEvent,
   loadingPay,
@@ -65,7 +65,7 @@ export default function StepReservationConfig({
     loading: profileLoading,
     data: profileData,
     error: profileError,
-  } = useQuery(GET_PROFILE_LAWYER);
+  } = useQuery(GET_PROFILE_MEMBER);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("es-PE", {
@@ -266,23 +266,23 @@ export default function StepReservationConfig({
   };
 
   const handlePayment = async () => {
-    const total = getTotal();
-    const billingInfo: BillinInfo = {
-      address: get(profileData, "getProfile.address", ""),
-      department: get(profileData, "getProfile.department", ""),
-      district: get(profileData, "getProfile.district", ""),
-      country: get(profileData, "getProfile.country", ""),
-      dni: get(profileData, "getProfile.dni", ""),
-      email: get(profileData, "getProfile.email", ""),
-      name: get(profileData, "getProfile.name", ""),
-      maternal_surname: get(profileData, "getProfile.maternal_surname", ""),
-      paternal_surname: get(profileData, "getProfile.paternal_surname", ""),
-      cip: get(profileData, "getProfile.cip", ""),
-      phone: get(profileData, "getProfile.phone", ""),
-      zipCode: billingData.zipCode,
-      province: get(profileData, "getProfile.province", ""),
-      socialReason: billingData.socialReason || "",
-    };
+    // const total = getTotal();
+    // const billingInfo: BillinInfo = {
+    //   address: get(profileData, "getProfile.address", ""),
+    //   department: get(profileData, "getProfile.department", ""),
+    //   district: get(profileData, "getProfile.district", ""),
+    //   country: get(profileData, "getProfile.country", ""),
+    //   dni: get(profileData, "getProfile.dni", ""),
+    //   email: get(profileData, "getProfile.email", ""),
+    //   name: get(profileData, "getProfile.name", ""),
+    //   maternal_surname: get(profileData, "getProfile.maternal_surname", ""),
+    //   paternal_surname: get(profileData, "getProfile.paternal_surname", ""),
+    //   cip: get(profileData, "getProfile.cip", ""),
+    //   phone: get(profileData, "getProfile.phone", ""),
+    //   zipCode: billingData.zipCode,
+    //   province: get(profileData, "getProfile.province", ""),
+    //   socialReason: billingData.socialReason || "",
+    // };
 
     const items: Items[] = [];
 
@@ -296,12 +296,12 @@ export default function StepReservationConfig({
       reservationId: getSelectedSlotInfo()?.idProduct || "",
     });
 
-    await onNext({
-      total,
-      idProduct: getSelectedSlotInfo()?.idProduct,
-      billingData: billingInfo,
-      items,
-    });
+    // await onNext({
+    //   total,
+    //   idProduct: getSelectedSlotInfo()?.idProduct,
+    //   billingData: billingInfo,
+    //   items,
+    // });
   };
 
   return (

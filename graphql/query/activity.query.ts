@@ -16,6 +16,10 @@ export const GET_ACTIVITY_BY_ID = gql`
       hasPrice
       price
       priceInvitee
+      priceExternal
+      stock
+      stockUsed
+      guestStock
       concurrence
       days
       finishConcurrence

@@ -81,29 +81,6 @@ export const generateTransactionId = () => {
   return transactionIdGen.rnd();
 };
 
-export const METHOD_CONFIG = {
-  quotes: {
-    title: "Pago de Cuotas",
-    steps: 3,
-    stepLabels: ["Configuración", "Facturación", "Resultado"],
-  },
-  reservation: {
-    title: "Reserva de Espacios",
-    steps: 2,
-    stepLabels: ["Opciones", "Resultado"],
-  },
-  academicEvents: {
-    title: "Evento Académico",
-    steps: 2,
-    stepLabels: ["Facturación", "Resultado"],
-  },
-  socialEvents: {
-    title: "Evento Social",
-    steps: 2,
-    stepLabels: ["Facturación", "Resultado"],
-  },
-};
-
 export const formatDate = (date: string) => {
   if (!date) {
     return "";

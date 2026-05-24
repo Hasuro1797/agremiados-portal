@@ -1,715 +1,535 @@
 "use client";
+
 import { Button } from "@/components/ui/button";
 import {
-  CREATE_INVOICE,
-  UPDATE_INVOICE,
-} from "@/graphql/mutation/invoice.mutation";
-import { setIziConfig } from "@/lib/izipay";
+  CONFIRM_PAYMENT,
+  ENROLL_FREE_ACTIVITY,
+  GENERATE_PAYMENT_TOKEN,
+} from "@/graphql/mutation/payment.mutation";
+import { GET_ACTIVITY_BY_ID } from "@/graphql/query/activity.query";
+import { GET_PROFILE_MEMBER } from "@/graphql/query/member.query";
+import { MY_QUOTA_PAYMENTS } from "@/graphql/query/payment.query";
+import { buildIziConfig, getCountryISO } from "@/lib/izipay";
 import { routes } from "@/lib/routes";
-import { METHOD_CONFIG } from "@/lib/utils";
+import { useUserStore } from "@/providers/user-provider";
 import {
-  AmountForQuote,
-  EventDiscount,
-  OrderPayment,
-} from "@/types/orders.type";
-import { useApolloClient, useLazyQuery, useMutation } from "@apollo/client";
+  ActivityForCheckout,
+  BillingFormData,
+  ConfirmPaymentResult,
+  DocumentType,
+  EnrollFreeActivityResult,
+  GeneratePaymentTokenInput,
+  Guest,
+  PaymentTargetType,
+  PaymentTokenResult,
+  QuotaPayment,
+} from "@/types/payment.type";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client";
 import { get } from "lodash";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CheckoutLayout } from "./checkout/CheckoutLayout";
-import { ProgressBar } from "./checkout/ProgressBar";
-import StepBillingInfo from "./checkout/StepBillingInfo";
-import StepPaymentConfig from "./checkout/stepPaymentConfig";
-// import { GET_ACADEMIC_ACTIVITY_BY_ID } from "@/graphql/query/acedemic.query";
-// import { GET_SOCIAL_ACTIVITY_BY_ID } from "@/graphql/query/social.query";
-import StepPaymentResult from "./checkout/stepPaymentResult";
-import { GET_RESERVATION_BY_ID } from "@/graphql/query/agreement.query";
-import StepReservationConfig from "./checkout/StepReservationConfig";
-import { useUserStore } from "@/providers/user-provider";
-import { GET_ACTIVITY_BY_ID } from "@/graphql/query/activity.query";
+import ActivityConfigStep from "./steps/ActivityConfigStep";
+import PaymentFormStep from "./steps/PaymentFormStep";
+import { ProgressBar } from "./steps/ProgressBar";
+import QuotaConfigStep from "./steps/QuotaConfigStep";
+import ResultStep, { ResultUiStatus } from "./steps/ResultStep";
+
+type CheckoutMethodType = "quotes" | "academicEvents" | "socialEvents";
+type FlowStep = "config" | "pay" | "result";
+
+const CHECKOUT_CONFIG: Record<
+  CheckoutMethodType,
+  { title: string; stepLabels: string[] }
+> = {
+  quotes: {
+    title: "Pago de Cuotas",
+    stepLabels: ["Cuotas", "Pago", "Resultado"],
+  },
+  academicEvents: {
+    title: "Evento Académico",
+    stepLabels: ["Inscripción", "Pago", "Resultado"],
+  },
+  socialEvents: {
+    title: "Evento Social",
+    stepLabels: ["Inscripción", "Pago", "Resultado"],
+  },
+};
+
+const DEFAULT_POSTAL_CODE = "15001";
+
+const defaultBilling: BillingFormData = {
+  needsInvoice: false,
+  documentNumber: "",
+  clientName: "",
+  billingAddress: "",
+};
+
+const toErrorMessage = (message?: string) =>
+  message || "Ocurrió un error. Por favor, inténtalo nuevamente.";
+
+const statusToUi = (status: ConfirmPaymentResult["status"]): ResultUiStatus => {
+  switch (status) {
+    case "PAGADO":
+      return "success";
+    case "CANCELADO":
+      return "canceled";
+    case "FALLIDO":
+      return "failed";
+    case "EXPIRADO":
+      return "expired";
+    case "PENDIENTE":
+    default:
+      return "pending";
+  }
+};
+
+const flowStepToNumber = (step: FlowStep): number =>
+  step === "config" ? 1 : step === "pay" ? 2 : 3;
 
 interface CheckoutDetailProps {
   methodType: string;
 }
 
-export interface BillingData {
-  zipCode: string;
-  socialReason: string;
-}
-
-export interface VoucherConfiguration {
-  typeOfVoucher: "01" | "03";
-  cardOrigin: "L" | "F";
-}
-
-export interface Event {
-  date: string;
-  id: number;
-  title: string;
-  price: number;
-  description?: string;
-  href?: string;
-  stock: number;
-  hasPrice: boolean;
-  status_stock: number;
-  hasInvitees?: boolean;
-  InviteStock?: number;
-  priceInvitee?: number;
-  discounts?: EventDiscount[];
-}
-
-export interface OptionForm {
-  idProduct: string;
-  type: "SINGLE" | "RANGE";
-  startTime: string;
-  endTime: string;
-  startDate: string;
-  endDate: string;
-}
-
-export interface Options extends OptionForm {
-  hours: number;
-  status: "LIBRE" | "OCUPADO";
-}
-
-export interface ReservationData {
-  title: string;
-  stock: number;
-  price: number;
-  id: number;
-  productIdSelected?: string;
-  hours?: number;
-  dates: Options[];
-}
-
-export type MethodType =
-  | "quotes"
-  | "reservation"
-  | "academicEvents"
-  | "socialEvents";
-export type PaymentStatus =
-  | "processing"
-  | "success"
-  | "canceled"
-  | "izipayError"
-  | "serverError";
-
-const COUNTRY_ISO_MAP: Record<string, string> = {
-  PERÚ: "PE",
-  PERU: "PE",
-  PAIS: "PE",
-  BELGICA: "BE",
-  ESPAÑA: "ES",
-  CHILE: "CL",
-  ITALIA: "IT",
-  CHINA: "CN",
-  "ESTADOS UNIDOS": "US",
-};
-
 export default function CheckoutDetail({ methodType }: CheckoutDetailProps) {
   const router = useRouter();
   const apolloClient = useApolloClient();
-  const { id: lawyerId } = useUserStore((state) => state);
+  const userId = useUserStore((state) => state.id);
 
-  const [currentStep, setCurrentStep] = useState(1);
-  const [paymentStatus, setPaymentStatus] =
-    useState<PaymentStatus>("processing");
-  const [transactionId, setTransactionId] = useState("");
-  const [orderError, setOrderError] = useState<string | null>(null);
-  const [paidTotal, setPaidTotal] = useState(0);
-  const [eventData, setEventData] = useState<Event>({
-    date: "",
-    id: 0,
-    title: "",
-    price: 0,
-    stock: 0,
-    hasPrice: false,
-    status_stock: 0,
-  });
-  const [billingData, setBillingData] = useState<BillingData>({
-    zipCode: "",
-    socialReason: "",
-  });
+  const isValidMethod = methodType in CHECKOUT_CONFIG;
+  const method = methodType as CheckoutMethodType;
+  const isQuotes = method === "quotes";
 
-  const [voucherConfiguration, setVoucherConfiguration] =
-    useState<VoucherConfiguration>({
-      typeOfVoucher: "03",
-      cardOrigin: "L",
-    });
-
-  const [paymentData, setPaymentData] = useState<AmountForQuote>({
-    socialAmount: {
-      total: 0,
-      percentageDiscount: 0,
-      totalWithDiscount: 0,
-    },
-    mutualAmount: {
-      total: 0,
-      percentageDiscount: 0,
-      totalWithDiscount: 0,
-    },
-    periodFrom: "",
-    quantityInstallments: 0,
-  });
-
-  const [reservationData, setReservationData] = useState<ReservationData>({
-    title: "",
-    stock: 0,
-    price: 0,
-    id: 0,
-    productIdSelected: "",
-    hours: 0,
-    dates: [],
-  });
-
-  const [academicEvents, { loading: academicLoading, error: academicError }] =
-    useLazyQuery(GET_ACTIVITY_BY_ID, {
-      fetchPolicy: "no-cache",
-    });
-  const [socialEvents, { loading: socialLoading, error: socialError }] =
-    useLazyQuery(GET_ACTIVITY_BY_ID, {
-      fetchPolicy: "no-cache",
-    });
-
-  const [
-    reservation,
-    { loading: reservationLoading, error: reservationError },
-  ] = useLazyQuery(GET_RESERVATION_BY_ID, {
-    fetchPolicy: "no-cache",
-  });
-
-  const [createInvoice, { loading: createInvoiceLoading }] = useMutation(
-    CREATE_INVOICE,
-    {
-      onError(error) {
-        toast.error(error.message || "Ocurrió un error en generar la orden", {
-          description: "Por favor, intenta nuevamente",
-          classNames: {
-            icon: "text-red-500",
-            title: "text-primary",
-          },
-        });
-        console.error(error);
-      },
-      fetchPolicy: "no-cache",
-    },
+  const [flowStep, setFlowStep] = useState<FlowStep>("config");
+  const [billing, setBilling] = useState<BillingFormData>(defaultBilling);
+  const [selectedQuotaIds, setSelectedQuotaIds] = useState<number[]>([]);
+  const [paying, setPaying] = useState(false);
+  const [resultStatus, setResultStatus] =
+    useState<ResultUiStatus>("processing");
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [tokenResult, setTokenResult] = useState<PaymentTokenResult | null>(
+    null,
   );
-  const [updateInvoice] = useMutation(UPDATE_INVOICE, {
-    fetchPolicy: "no-cache",
-  });
+  const [activityId, setActivityId] = useState<number | null>(null);
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [enrolling, setEnrolling] = useState(false);
+
+  // Guards the embedded-form load so it mounts exactly once per token.
+  const formLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (methodType === "academicEvents") {
-      const eventId = window.localStorage.getItem("productId");
-      if (eventId) {
-        academicEvents({
-          variables: { ActivityId: +eventId },
-        })
-          .then((response) => {
-            const { data } = response;
-            setEventData({
-              date: get(data, "findOneAcademicActivity.date", ""),
-              id: get(data, "findOneAcademicActivity.id", 0),
-              title: get(data, "findOneAcademicActivity.title", ""),
-              price: get(data, "findOneAcademicActivity.price", 0),
-              stock: get(data, "findOneAcademicActivity.stock", 0),
-              hasPrice: get(data, "findOneAcademicActivity.hasPrice", false),
-              status_stock: get(
-                data,
-                "findOneAcademicActivity.status_stock",
-                0,
-              ),
-              discounts: get(data, "findOneAcademicActivity.discounts", []),
-            });
-          })
-          .catch((error) => {
-            console.error("Error fetching academic event:", error);
-          });
-      }
-    } else if (methodType === "socialEvents") {
-      const eventId = window.localStorage.getItem("productId");
-      if (eventId) {
-        socialEvents({
-          variables: { ActivityId: +eventId },
-        })
-          .then((response) => {
-            const { data } = response;
-            setEventData({
-              date: get(data, "findOneSocialActivity.date", ""),
-              id: get(data, "findOneSocialActivity.id", 0),
-              title: get(data, "findOneSocialActivity.title", ""),
-              price: get(data, "findOneSocialActivity.price", 0),
-              stock: get(data, "findOneSocialActivity.stock", 0),
-              hasPrice: get(data, "findOneSocialActivity.hasPrice", false),
-              status_stock: get(data, "findOneSocialActivity.status_stock", 0),
-              hasInvitees: get(
-                data,
-                "findOneSocialActivity.hasInvitees",
-                false,
-              ),
-              InviteStock: get(data, "findOneSocialActivity.InviteStock", 0),
-              priceInvitee: get(data, "findOneSocialActivity.priceInvitee", 0),
-              discounts: get(data, "findOneSocialActivity.discounts", []),
-            });
-          })
-          .catch((error) => {
-            console.error("Error fetching social event:", error);
-          });
-      }
-    } else if (methodType === "reservation") {
-      const reservationId = window.localStorage.getItem("productId");
-      if (reservationId) {
-        reservation({
-          variables: { reservationId: +reservationId },
-        })
-          .then((response) => {
-            const { data } = response;
-            const reservationInfo = get(data, "finOneReservation", null);
-            if (reservationInfo) {
-              setReservationData({
-                dates: reservationInfo.dates || [],
-                title: reservationInfo.title || "",
-                stock: reservationInfo.stock || 0,
-                price: reservationInfo.price || 0,
-                id: reservationInfo.id || 0,
-              });
-            } else {
-              console.error("No reservation data found");
-            }
-          })
-          .catch((error) => {
-            console.error("Error fetching reservation data:", error);
-          });
-      }
-    }
-  }, [methodType, academicEvents, socialEvents, reservation]);
-
-  useEffect(() => {
-    if (!METHOD_CONFIG[methodType as MethodType]) {
+    if (!isValidMethod) {
       router.replace(routes.home);
     }
-  }, [methodType, router]);
+  }, [isValidMethod, router]);
 
-  if (!METHOD_CONFIG[methodType as MethodType]) {
-    return null;
-  }
-
-  const config = METHOD_CONFIG[methodType as MethodType];
-  const totalSteps = config.steps;
-
-  const getCountryISO = (countryName: string): string => {
-    return COUNTRY_ISO_MAP[countryName] || "PE";
-  };
-
-  const handleNext = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep((prev) => prev + 1);
+  useEffect(() => {
+    if (!isQuotes && typeof window !== "undefined") {
+      const raw = window.localStorage.getItem("productId");
+      setActivityId(raw ? Number(raw) : null);
     }
-  };
+  }, [isQuotes]);
 
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep((prev) => prev - 1);
+  // --- Data fetching ---
+  const { data: profileData } = useQuery(GET_PROFILE_MEMBER, {
+    fetchPolicy: "cache-first",
+  });
+
+  const {
+    data: quotasData,
+    loading: quotasLoading,
+    error: quotasError,
+  } = useQuery(MY_QUOTA_PAYMENTS, {
+    variables: { status: "PENDIENTE" },
+    fetchPolicy: "cache-and-network",
+    skip: !isQuotes,
+  });
+
+  const {
+    data: activityData,
+    loading: activityLoading,
+    error: activityError,
+  } = useQuery(GET_ACTIVITY_BY_ID, {
+    variables: { id: activityId },
+    fetchPolicy: "cache-and-network",
+    skip: isQuotes || activityId === null,
+  });
+
+  const quotas: QuotaPayment[] = useMemo(
+    () => get(quotasData, "myQuotaPayments", []) as QuotaPayment[],
+    [quotasData],
+  );
+
+  const activity: ActivityForCheckout | null = useMemo(() => {
+    const raw = get(activityData, "findOneActivity", null);
+    return raw ? (raw as ActivityForCheckout) : null;
+  }, [activityData]);
+
+  // Preselect every pending quota by default once loaded.
+  useEffect(() => {
+    if (isQuotes && quotas.length > 0) {
+      setSelectedQuotaIds((prev) =>
+        prev.length === 0 ? quotas.map((q) => q.id) : prev,
+      );
     }
+  }, [isQuotes, quotas]);
+
+  const [generatePaymentToken] = useMutation(GENERATE_PAYMENT_TOKEN, {
+    fetchPolicy: "no-cache",
+  });
+  const [confirmPayment] = useMutation(CONFIRM_PAYMENT, {
+    fetchPolicy: "no-cache",
+  });
+  const [enrollFreeActivity] = useMutation(ENROLL_FREE_ACTIVITY, {
+    fetchPolicy: "no-cache",
+  });
+
+  const config = isValidMethod ? CHECKOUT_CONFIG[method] : null;
+
+  const toggleQuota = (id: number) =>
+    setSelectedQuotaIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+
+  const toggleAllQuotas = (checked: boolean) =>
+    setSelectedQuotaIds(checked ? quotas.map((q) => q.id) : []);
+
+  const refetchAfterSuccess = () => {
+    apolloClient.refetchQueries({
+      include: ["MyQuotaPayments", "GetStatusMember", "GetActivityById"],
+    });
   };
 
-  // const getTotal = () => {
-  //   if (methodType === "quotes") {
-  //     const social = paymentData.discountId
-  //       ? paymentData.socialAmount.totalWithDiscount
-  //       : paymentData.socialAmount.total;
-  //     return social + paymentData.mutualAmount.total;
-  //   } else if (
-  //     methodType === "academicEvents" ||
-  //     methodType === "socialEvents"
-  //   ) {
-  //     return eventData?.price || 0;
-  //   } else if (methodType === "reservation") {
-  //     return reservationData.price * get(reservationData, "hours", 0);
-  //   }
-  //   return 0;
-  // };
+  const buildBilling = () => {
+    const p = profileData?.me;
+    const fullStreet = `${get(p, "address", "")}, ${get(p, "district", "")}`
+      .trim()
+      .slice(0, 40);
+    console.log("Profile data for billing", p);
+    return {
+      firstName: get(p, "name", "") as string,
+      lastName:
+        `${get(p, "paternalSurname", "")} ${get(p, "maternalSurname", "")}`.trim(),
+      email: get(p, "email", "") as string,
+      // Izipay requires a phone number
+      phoneNumber: p.phone || "123456789",
+      // street has a max length of 40 chars and 5 min in Izipay, so we build it with address + district and truncate if needed
+      street: fullStreet.length >= 5 ? fullStreet : "Sin dirección",
+      city: (get(p, "province", "") as string) || "Lima",
+      state: (get(p, "department", "") as string) || "Lima",
+      country: getCountryISO(get(p, "country", "") as string),
+      postalCode: DEFAULT_POSTAL_CODE,
+      document: (get(p, "dni", "") as string) || "",
+      documentType: "DNI",
+      companyName: billing.needsInvoice ? billing.clientName : undefined,
+    };
+  };
 
-  const handlePayment = async (orderPayment: OrderPayment) => {
-    const productId = window.localStorage.getItem("productId");
-    if (methodType !== "quotes" && !productId) {
-      toast.error("No se encontró el ID del producto", {
-        description: "Por favor, inténtalo nuevamente.",
-        classNames: {
-          icon: "text-red-500",
-          title: "text-primary",
+  const buildTokenInput = (): GeneratePaymentTokenInput => {
+    const invoiceFields = billing.needsInvoice
+      ? {
+          documentType: DocumentType.RUC,
+          documentNumber: billing.documentNumber,
+          clientName: billing.clientName,
+          ...(billing.billingAddress
+            ? { billingAddress: billing.billingAddress }
+            : {}),
+        }
+      : {};
+
+    if (isQuotes) {
+      return {
+        target: PaymentTargetType.QUOTA,
+        quotaPaymentIds: selectedQuotaIds,
+        ...invoiceFields,
+      };
+    }
+    return {
+      target: PaymentTargetType.ACTIVITY,
+      targetId: activityId ?? undefined,
+      ...(guests.length > 0 ? { guests } : {}),
+      ...invoiceFields,
+    };
+  };
+
+  const handleCallback = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    response: any,
+    transactionId: string,
+  ) => {
+    // User closed the Izipay form without completing the payment.
+    if (response?.code === "P54") {
+      setResultStatus("canceled");
+      setResultMessage(null);
+      setFlowStep("result");
+      return;
+    }
+
+    setResultStatus("processing");
+    setFlowStep("result");
+    try {
+      const { data } = await confirmPayment({
+        variables: {
+          input: {
+            transactionId,
+            // Izipay Web-Core returns the signed hash and the raw answer string
+            // under these keys; forward them untouched (no re-serialization).
+            signature:
+              response?.["kr-hash"] ?? response?.signature ?? response?.hash,
+            payloadHttp:
+              response?.["kr-answer"] ??
+              response?.payloadHttp ??
+              response?.rawClientAnswer,
+            answer: response,
+          },
         },
+      });
+      const result = get(
+        data,
+        "confirmPayment",
+        null,
+      ) as ConfirmPaymentResult | null;
+      if (!result) {
+        setResultStatus("serverError");
+        setResultMessage(null);
+        return;
+      }
+      setResultStatus(statusToUi(result.status));
+      setResultMessage(result.message);
+      if (result.status === "PAGADO") {
+        refetchAfterSuccess();
+      }
+    } catch (error) {
+      console.error("[confirmPayment] error", error);
+      setResultStatus("serverError");
+      setResultMessage(null);
+    }
+  };
+
+  const handlePay = async () => {
+    if (!isValidMethod) return;
+    if (!profileData?.me) {
+      toast.error("No pudimos cargar tus datos de facturación", {
+        description: "Por favor, recarga la página e inténtalo de nuevo.",
       });
       return;
     }
-    const {
-      total,
-      items,
-      billingData,
-      withIGV,
-      quoteInfo,
-      invitees,
-      invoiceConfig,
-    } = orderPayment;
-    console.log("Total a pagar:", orderPayment);
-    setPaidTotal(total);
+    if (!isQuotes && activityId === null) {
+      toast.error("No se encontró la actividad a pagar", {
+        description: "Vuelve a la actividad e inténtalo nuevamente.",
+      });
+      return;
+    }
+
+    setPaying(true);
     try {
-      console.log("Datos para crear la factura:", {
-        total,
-        items,
-        billingData,
-        withIGV,
-        quoteInfo,
-        invitees,
-        methodType,
-        productId,
+      const { data } = await generatePaymentToken({
+        variables: { input: buildTokenInput() },
       });
-      const { data: createInvoiceData } = await createInvoice({
-        variables: {
-          createInvoiceInput: {
-            infoInvoice: {
-              amount: total,
-              currency: "PEN",
-              withIGV: withIGV,
-              paramId: methodType,
-              ...(methodType !== "quotes" &&
-                productId !== null && { activityId: +productId }),
-              idDocument: invoiceConfig.idDocument,
-              clientName: invoiceConfig.clientName,
-              documentType: invoiceConfig.documentType,
-              documentNumber: invoiceConfig.documentNumber,
-              billingAddress: invoiceConfig.billingAddress,
-              saleCondition: invoiceConfig.saleCondition,
-            },
-            invoiceDetails: items,
-            ...(methodType === "quotes" && { quoteInfo }),
-            ...(methodType === "socialEvents" &&
-              invitees &&
-              invitees.length > 0 && { invitees }),
-          },
-          mode: "WEB",
-        },
-      });
-      console.log("se genero esto de nuevo", createInvoiceData);
-      if (createInvoiceData) {
-        const token = get(createInvoiceData, "createInvoice.token", "");
-        if (
-          !token &&
-          get(createInvoiceData, "createInvoice.mode", "") !== "WEB"
-        ) {
-          toast.error("No se pudo generar el token de pago", {
-            description: "Por favor, inténtalo nuevamente.",
-            classNames: {
-              icon: "text-red-500",
-              title: "text-primary",
-            },
-          });
-          return;
-        }
-        setTransactionId(
-          get(createInvoiceData, "createInvoice.transactionId", ""),
-        );
-
-        const iziconfig = setIziConfig(
-          {
-            orderNumber: get(
-              createInvoiceData,
-              "createInvoice.orderNumber",
-              "",
-            ),
-            amount: get(createInvoiceData, "createInvoice.amount", 0)
-              .toFixed(2)
-              .toString(),
-            transactionId: get(
-              createInvoiceData,
-              "createInvoice.transactionId",
-              "",
-            ),
-            merchantCode: get(
-              createInvoiceData,
-              "createInvoice.merchantCode",
-              "",
-            ),
-            idMerchantBuyer: lawyerId,
-            publicKey: get(createInvoiceData, "createInvoice.publicKey", ""),
-          },
-          {
-            firstName: billingData.name,
-            lastName: `${billingData.paternal_surname} ${billingData.maternal_surname}`,
-            email: billingData.email,
-            phoneNumber: billingData.phone,
-            street: `${billingData.address}, ${billingData.district}`.slice(
-              0,
-              40,
-            ),
-            city: billingData.province,
-            state: billingData.department,
-            country: getCountryISO(billingData.country) || "PE",
-            postalCode: billingData.zipCode,
-            document: invoiceConfig.documentNumber,
-            companyName:
-              invoiceConfig.idDocument === "01"
-                ? invoiceConfig.clientName
-                : undefined,
-          },
-          {
-            action: "pay",
-            processType: "AT",
-            payMethod: {
-              CARD: "CARD",
-              YAPE: "YAPE_CODE",
-              QR: "QR",
-              PLIN: "PAGO_PUSH",
-            },
-            tyform: "pop-up",
-            currency: "PEN",
-            documentType: invoiceConfig.documentType,
-          },
-        );
-
-        //callback
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const callbackResponsePayment = async (response: any) => {
-          const localTransactionId = get(
-            createInvoiceData,
-            "createInvoice.transactionId",
-            "",
-          );
-          const localOrderNumber = get(
-            createInvoiceData,
-            "createInvoice.orderNumber",
-            "",
-          );
-          if (response.code !== "P54") {
-            try {
-              await updateInvoice({
-                variables: {
-                  updateInvoiceInput: {
-                    rawData: JSON.stringify(response),
-                    orderNumber: localOrderNumber,
-                    transactionId: localTransactionId,
-                    ...(methodType === "quotes" &&
-                      quoteInfo && {
-                        quoteInfo: {
-                          periodTo: quoteInfo.periodTo,
-                        },
-                      }),
-                  },
-                  paramId: methodType,
-                  ...(methodType !== "quotes" && {
-                    activityId: productId ? +productId : undefined,
-                  }),
-                },
-              });
-              if (
-                typeof response === "object" &&
-                response !== null &&
-                "code" in response
-              ) {
-                const code = (response as { code: string }).code;
-                if (code === "00") {
-                  setPaymentStatus("success");
-                  apolloClient.refetchQueries({ include: ["GetLawyerStatus"] });
-                } else if (code === "021" || code === "COMMUNICATION_ERROR") {
-                  setPaymentStatus("canceled");
-                } else {
-                  setPaymentStatus("izipayError");
-                  setOrderError(
-                    typeof response === "object" &&
-                      response !== null &&
-                      "message" in response
-                      ? (response as { message: string }).message ||
-                          "Error desconocido"
-                      : "Error desconocido",
-                  );
-                }
-              } else {
-                setPaymentStatus("izipayError");
-                setOrderError("Respuesta de pago no válida");
-              }
-            } catch (error) {
-              console.error(
-                "[SERVER ERROR] Error al actualizar la orden de pago. Es posible que el cargo haya sido generado:",
-                error,
-              );
-              setPaymentStatus("serverError");
-            }
-          } else {
-            setPaymentStatus("izipayError");
-            setOrderError(response.message || "Error en el servicio de pagos");
-          }
-        };
-
-        const checkout = new Izipay({ config: iziconfig?.config });
-        if (checkout) {
-          checkout.LoadForm({
-            authorization: token,
-            keyRSA: "RSA",
-            callbackResponse: callbackResponsePayment,
-          });
-        }
-        setCurrentStep(totalSteps);
-        setPaymentStatus("processing");
+      const token = get(
+        data,
+        "generatePaymentToken",
+        null,
+      ) as PaymentTokenResult | null;
+      if (!token?.token) {
+        toast.error("No se pudo generar el pago", {
+          description: "Por favor, inténtalo nuevamente.",
+        });
+        return;
       }
+      formLoadedRef.current = false;
+      setTokenResult(token);
+      setResultMessage(null);
+      setFlowStep("pay");
     } catch (error) {
-      console.error(error);
+      const message = error instanceof Error ? error.message : undefined;
+      toast.error(toErrorMessage(message), {
+        description: "Por favor, inténtalo nuevamente.",
+      });
+      // Stock/quota errors should refresh availability.
+      apolloClient.refetchQueries({
+        include: ["MyQuotaPayments", "GetActivityById"],
+      });
+    } finally {
+      setPaying(false);
     }
   };
 
-  const renderStepContent = () => {
-    if (methodType === "reservation") {
-      switch (currentStep) {
-        case 1:
-          return (
-            <StepReservationConfig
-              billingData={billingData}
-              setBillingData={setBillingData}
-              reservationData={reservationData}
-              setReservationData={setReservationData}
-              onNext={handlePayment}
-              loadingReservation={reservationLoading}
-              errorEvent={Boolean(reservationError)}
-              loadingPay={createInvoiceLoading}
-              methodType={methodType}
-            />
-          );
-        case 2:
-          return (
-            <StepPaymentResult
-              paymentStatus={paymentStatus}
-              transactionId={transactionId}
-              total={paidTotal}
-              orderError={orderError}
-            />
-          );
-        default:
-          return null;
-      }
-    }
-    if (methodType === "academicEvents" || methodType === "socialEvents") {
-      switch (currentStep) {
-        case 1:
-          return (
-            <StepBillingInfo
-              billingData={billingData}
-              setBillingData={setBillingData}
-              onNext={handlePayment}
-              onBack={handleBack}
-              eventData={eventData}
-              loadingEvent={academicLoading || socialLoading}
-              errorEvent={Boolean(academicError) || Boolean(socialError)}
-              loadingPay={createInvoiceLoading}
-              voucherConfiguration={voucherConfiguration}
-              setVoucherConfiguration={setVoucherConfiguration}
-              methodType={methodType}
-              paymentData={undefined}
-            />
-          );
-        case 2:
-          return (
-            <StepPaymentResult
-              paymentStatus={paymentStatus}
-              transactionId={transactionId}
-              total={paidTotal}
-              orderError={orderError}
-            />
-          );
-        default:
-          return null;
-      }
-    }
-
-    switch (currentStep) {
-      case 1:
-        if (methodType === "quotes") {
-          return (
-            <StepPaymentConfig
-              setPaymentData={setPaymentData}
-              handleNext={handleNext}
-            />
-          );
-        }
-        return null;
-      case 2:
-        return (
-          <StepBillingInfo
-            loadingPay={createInvoiceLoading}
-            billingData={billingData}
-            setBillingData={setBillingData}
-            onNext={handlePayment}
-            onBack={handleBack}
-            paymentData={methodType === "quotes" ? paymentData : undefined}
-            eventData={
-              methodType === "academicEvents" || methodType === "socialEvents"
-                ? eventData
-                : undefined
-            }
-            loadingEvent={academicLoading || socialLoading}
-            errorEvent={Boolean(academicError) || Boolean(socialError)}
-            voucherConfiguration={voucherConfiguration}
-            setVoucherConfiguration={setVoucherConfiguration}
-          />
-        );
-      case 3:
-        return (
-          <StepPaymentResult
-            paymentStatus={paymentStatus}
-            transactionId={transactionId}
-            total={paidTotal}
-            orderError={orderError}
-          />
-        );
-      default:
-        return null;
+  const handleEnrollFree = async () => {
+    if (isQuotes || activityId === null) return;
+    setEnrolling(true);
+    try {
+      const { data } = await enrollFreeActivity({
+        variables: { activityId },
+      });
+      const result = get(
+        data,
+        "enrollFreeActivity",
+        null,
+      ) as EnrollFreeActivityResult | null;
+      setResultStatus("success");
+      setResultMessage(result?.message ?? "Tu inscripción fue confirmada.");
+      setFlowStep("result");
+      refetchAfterSuccess();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : undefined;
+      toast.error(toErrorMessage(message), {
+        description: "Por favor, inténtalo nuevamente.",
+      });
+      apolloClient.refetchQueries({ include: ["GetActivityById"] });
+    } finally {
+      setEnrolling(false);
     }
   };
+
+  // Mount the Izipay form once we reach the pay step and have a fresh token.
+  useEffect(() => {
+    if (flowStep !== "pay" || !tokenResult || formLoadedRef.current) return;
+    formLoadedRef.current = true;
+    try {
+      const iziConfig = buildIziConfig({
+        transactionId: tokenResult.transactionId,
+        orderNumber: tokenResult.orderNumber,
+        amountCents: tokenResult.amountCents,
+        merchantBuyerId: userId,
+        billing: buildBilling(),
+      });
+      console.log("Izipay config", iziConfig);
+      const checkout = new Izipay({ config: iziConfig.config });
+      checkout.LoadForm({
+        authorization: tokenResult.token,
+        keyRSA: "RSA",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        callbackResponse: (response: any) =>
+          handleCallback(response, tokenResult.transactionId),
+      });
+    } catch (error) {
+      console.error("[Izipay] LoadForm error", error);
+      formLoadedRef.current = false;
+      toast.error("No se pudo cargar el formulario de pago", {
+        description: "Por favor, inténtalo nuevamente.",
+      });
+      setFlowStep("config");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowStep, tokenResult]);
+
+  const handleRetry = () => {
+    setResultMessage(null);
+    setResultStatus("processing");
+    handlePay();
+  };
+
+  const handleCancelPay = () => {
+    formLoadedRef.current = false;
+    setTokenResult(null);
+    setFlowStep("config");
+  };
+
+  const handleExpire = () => {
+    formLoadedRef.current = false;
+    setResultStatus("expired");
+    setResultMessage(null);
+    setFlowStep("result");
+  };
+
+  if (!isValidMethod || !config) return null;
+
+  const renderStep = () => {
+    if (flowStep === "result") {
+      return (
+        <ResultStep
+          status={resultStatus}
+          message={resultMessage}
+          orderNumber={tokenResult?.orderNumber}
+          amount={tokenResult?.amount}
+          onRetry={handleRetry}
+          onHome={() => router.push(routes.home)}
+        />
+      );
+    }
+
+    if (flowStep === "pay") {
+      return (
+        <PaymentFormStep
+          amount={tokenResult?.amount}
+          orderNumber={tokenResult?.orderNumber}
+          expiresAt={tokenResult?.expiresAt}
+          onCancel={handleCancelPay}
+          onExpire={handleExpire}
+        />
+      );
+    }
+
+    if (isQuotes) {
+      return (
+        <QuotaConfigStep
+          quotas={quotas}
+          loading={quotasLoading && quotas.length === 0}
+          error={Boolean(quotasError)}
+          selectedIds={selectedQuotaIds}
+          onToggle={toggleQuota}
+          onToggleAll={toggleAllQuotas}
+          billing={billing}
+          onBillingChange={setBilling}
+          onPay={handlePay}
+          paying={paying}
+        />
+      );
+    }
+
+    return (
+      <ActivityConfigStep
+        activity={activity}
+        loading={activityLoading && !activity}
+        error={Boolean(activityError) || activityId === null}
+        billing={billing}
+        onBillingChange={setBilling}
+        guests={guests}
+        onGuestsChange={setGuests}
+        onPay={handlePay}
+        onEnrollFree={handleEnrollFree}
+        paying={paying}
+        enrolling={enrolling}
+      />
+    );
+  };
+
   return (
-    <CheckoutLayout>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-14">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push(routes.home)}
-                  className="text-gray-600 hover:text-gray-900"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver a Inicio
-                </Button>
-                <div className="h-6 w-px bg-gray-300" />
-                <h1 className="text-base sm:text-lg font-semibold text-blue-900">
-                  {config.title}
-                </h1>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="bg-white border-b border-gray-200 sticky top-14 z-10">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <ProgressBar
-              currentStep={currentStep}
-              totalSteps={totalSteps}
-              stepLabels={config.stepLabels}
-              paymentStatus={
-                currentStep === totalSteps ? paymentStatus : undefined
-              }
-            />
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {renderStepContent()}
+    <div className="min-h-screen bg-body/40">
+      {/* Header */}
+      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+        <div className="mx-auto flex h-14 max-w-3xl items-center gap-4 px-4 sm:px-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(routes.home)}
+            className="text-gray-600 hover:text-primary"
+          >
+            <ArrowLeft className="mr-2 size-4" />
+            Inicio
+          </Button>
+          <div className="h-6 w-px bg-gray-200" />
+          <h1 className="text-base font-semibold text-primary sm:text-lg">
+            {config.title}
+          </h1>
         </div>
       </div>
-    </CheckoutLayout>
+
+      {/* Progress */}
+      <div className="sticky top-14 z-10 border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-3xl px-4 py-3 sm:px-6">
+          <ProgressBar
+            currentStep={flowStepToNumber(flowStep)}
+            totalSteps={3}
+            stepLabels={config.stepLabels}
+          />
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">{renderStep()}</div>
+    </div>
   );
 }

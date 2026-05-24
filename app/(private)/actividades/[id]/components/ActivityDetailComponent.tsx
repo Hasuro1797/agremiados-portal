@@ -448,7 +448,15 @@ export default function ActivityDetailComponent({ id }: { id: string }) {
 
                   <Separator className="my-5" />
 
-                  <Link href={checkoutRoute} className="block">
+                  <Link
+                    href={checkoutRoute}
+                    className="block"
+                    onClick={() => {
+                      if (activity) {
+                        localStorage.setItem("productId", String(activity.id));
+                      }
+                    }}
+                  >
                     <Button
                       className="w-full font-semibold bg-accent hover:bg-accent-hover"
                       size="lg"

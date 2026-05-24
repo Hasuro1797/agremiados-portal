@@ -126,7 +126,7 @@ function AgreementCard({ agreement }: { agreement: IAgreement }) {
             <span className="truncate">{validUntilStr}</span>
           </span>
           <Link
-            href={`${routes.agreements}/${agreement.id}`}
+            href={`${routes.agreements.detail(agreement.id)}`}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors shrink-0"
           >
             Ver convenio

@@ -10,16 +10,12 @@ import {
   ActivityForCheckout,
   BillingFormData,
   Guest,
+  PaymentPreview,
 } from "@/types/payment.type";
-import {
-  CalendarDays,
-  CircleX,
-  Loader2,
-  Ticket,
-  Users,
-} from "lucide-react";
+import { CalendarDays, CircleX, Loader2, Ticket, Users } from "lucide-react";
 import BillingSection, { isBillingValid } from "./BillingSection";
 import GuestsSection, { isGuestValid } from "./GuestsSection";
+import PaymentBreakdown from "./PaymentBreakdown";
 
 interface ActivityConfigStepProps {
   activity: ActivityForCheckout | null;
@@ -33,14 +29,9 @@ interface ActivityConfigStepProps {
   onEnrollFree: () => void;
   paying: boolean;
   enrolling: boolean;
+  preview: PaymentPreview | null;
+  previewLoading: boolean;
 }
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: "PEN",
-    minimumFractionDigits: 2,
-  }).format(amount);
 
 export default function ActivityConfigStep({
   activity,
@@ -54,6 +45,8 @@ export default function ActivityConfigStep({
   onEnrollFree,
   paying,
   enrolling,
+  preview,
+  previewLoading,
 }: ActivityConfigStepProps) {
   if (loading) {
     return (
@@ -144,39 +137,12 @@ export default function ActivityConfigStep({
               <span className="text-lg font-bold text-green-700">Gratis</span>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 text-gray-600">
-                  <Ticket className="size-4 text-primary" />
-                  Inscripción (tú)
-                </span>
-                <span className="font-medium text-primary">
-                  {formatCurrency(activity.price)}
-                </span>
-              </div>
-              {guests.length > 0 && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">
-                    Invitados ({guests.length} × {formatCurrency(priceInvitee)})
-                  </span>
-                  <span className="font-medium text-primary">
-                    {formatCurrency(guestsTotal)}
-                  </span>
-                </div>
-              )}
-              <Separator />
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-700">
-                  Subtotal
-                </span>
-                <span className="text-lg font-bold text-primary">
-                  {formatCurrency(subtotal)}
-                </span>
-              </div>
-              <p className="text-xs text-gray-400">
-                Incluye IGV. El monto final se confirma al generar el pago.
-              </p>
-            </div>
+            <PaymentBreakdown
+              preview={preview}
+              loading={previewLoading}
+              fallbackSubtotal={subtotal}
+              showLines
+            />
           )}
         </CardContent>
       </Card>

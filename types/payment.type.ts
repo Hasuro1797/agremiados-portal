@@ -51,6 +51,40 @@ export interface EnrollFreeActivityResult {
   message: string;
 }
 
+export interface PaymentPreviewLine {
+  label: string;
+  quantity: number;
+  unitAmount: number;
+  amount: number;
+}
+
+export interface PreviewDiscount {
+  amount: number;
+  percentage: number;
+  name: string;
+}
+
+export interface PreviewIgv {
+  amount: number;
+  rate: number;
+}
+
+export interface PaymentPreview {
+  subtotal: number;
+  discount: PreviewDiscount | null;
+  igv: PreviewIgv | null;
+  total: number;
+  currency: string;
+  lines: PaymentPreviewLine[];
+}
+
+export interface PreviewPaymentInput {
+  target: PaymentTargetType;
+  targetId?: number;
+  quotaPaymentIds?: number[];
+  guests?: Guest[];
+}
+
 export interface PaymentTokenResult {
   token: string;
   transactionId: string;

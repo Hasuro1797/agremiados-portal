@@ -6,11 +6,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { BillingFormData, QuotaPayment } from "@/types/payment.type";
+import {
+  BillingFormData,
+  PaymentPreview,
+  QuotaPayment,
+} from "@/types/payment.type";
 import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
 import { CircleX, Loader2, ReceiptText, TriangleAlert } from "lucide-react";
 import BillingSection, { isBillingValid } from "./BillingSection";
+import PaymentBreakdown from "./PaymentBreakdown";
 
 interface QuotaConfigStepProps {
   quotas: QuotaPayment[];
@@ -23,6 +28,8 @@ interface QuotaConfigStepProps {
   onBillingChange: (data: BillingFormData) => void;
   onPay: () => void;
   paying: boolean;
+  preview: PaymentPreview | null;
+  previewLoading: boolean;
 }
 
 const formatCurrency = (amount: number) =>
@@ -48,8 +55,10 @@ export default function QuotaConfigStep({
   onBillingChange,
   onPay,
   paying,
+  preview,
+  previewLoading,
 }: QuotaConfigStepProps) {
-  const subtotal = quotas
+  const fallbackSubtotal = quotas
     .filter((q) => selectedIds.includes(q.id))
     .reduce((acc, q) => acc + q.period.amount, 0);
 
@@ -146,18 +155,11 @@ export default function QuotaConfigStep({
 
           <Separator className="my-2" />
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">
-              Subtotal ({selectedIds.length}{" "}
-              {selectedIds.length === 1 ? "cuota" : "cuotas"})
-            </span>
-            <span className="text-base font-bold text-primary">
-              {formatCurrency(subtotal)}
-            </span>
-          </div>
-          <p className="text-xs text-gray-400">
-            Los descuentos aplicables se calculan al confirmar el pago.
-          </p>
+          <PaymentBreakdown
+            preview={preview}
+            loading={previewLoading}
+            fallbackSubtotal={fallbackSubtotal}
+          />
         </CardContent>
       </Card>
 

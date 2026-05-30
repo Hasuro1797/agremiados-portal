@@ -8,7 +8,10 @@ import {
 } from "@/graphql/mutation/payment.mutation";
 import { GET_ACTIVITY_BY_ID } from "@/graphql/query/activity.query";
 import { GET_PROFILE_MEMBER } from "@/graphql/query/member.query";
-import { MY_QUOTA_PAYMENTS } from "@/graphql/query/payment.query";
+import {
+  MY_QUOTA_PAYMENTS,
+  PREVIEW_PAYMENT,
+} from "@/graphql/query/payment.query";
 import { buildIziConfig, getCountryISO } from "@/lib/izipay";
 import { routes } from "@/lib/routes";
 import { useUserStore } from "@/providers/user-provider";
@@ -20,8 +23,10 @@ import {
   EnrollFreeActivityResult,
   GeneratePaymentTokenInput,
   Guest,
+  PaymentPreview,
   PaymentTargetType,
   PaymentTokenResult,
+  PreviewPaymentInput,
   QuotaPayment,
 } from "@/types/payment.type";
 import { useApolloClient, useMutation, useQuery } from "@apollo/client";
@@ -165,6 +170,50 @@ export default function CheckoutDetail({ methodType }: CheckoutDetailProps) {
     const raw = get(activityData, "findOneActivity", null);
     return raw ? (raw as ActivityForCheckout) : null;
   }, [activityData]);
+
+  // Builds the input for the previewPayment query. Stable across re-renders
+  // when the relevant selection hasn't changed, so the query doesn't refire
+  // on every keystroke inside guest forms (we only depend on guests.length).
+  const guestsCount = guests.length;
+  const previewInput: PreviewPaymentInput | null = useMemo(() => {
+    if (isQuotes) {
+      if (selectedQuotaIds.length === 0) return null;
+      return {
+        target: PaymentTargetType.QUOTA,
+        quotaPaymentIds: selectedQuotaIds,
+      };
+    }
+    if (activityId === null || !activity) return null;
+    if (!activity.hasPrice || activity.price <= 0) return null;
+    const placeholderGuests: Guest[] = Array.from(
+      { length: guestsCount },
+      () => ({
+        documentType: DocumentType.DNI,
+        documentNumber: "00000000",
+        name: "preview",
+        lastname: "preview",
+        email: "preview@preview.local",
+        phone: "000000000",
+      }),
+    );
+    return {
+      target: PaymentTargetType.ACTIVITY,
+      targetId: activityId,
+      ...(guestsCount > 0 ? { guests: placeholderGuests } : {}),
+    };
+  }, [isQuotes, selectedQuotaIds, activityId, activity, guestsCount]);
+
+  const {
+    data: previewData,
+    loading: previewLoading,
+  } = useQuery(PREVIEW_PAYMENT, {
+    variables: { input: previewInput },
+    skip: !previewInput || flowStep !== "config",
+    fetchPolicy: "cache-and-network",
+  });
+
+  const preview = (get(previewData, "previewPayment", null) ??
+    null) as PaymentPreview | null;
 
   // Preselect every pending quota by default once loaded.
   useEffect(() => {
@@ -475,6 +524,8 @@ export default function CheckoutDetail({ methodType }: CheckoutDetailProps) {
           onBillingChange={setBilling}
           onPay={handlePay}
           paying={paying}
+          preview={preview}
+          previewLoading={previewLoading}
         />
       );
     }
@@ -492,6 +543,8 @@ export default function CheckoutDetail({ methodType }: CheckoutDetailProps) {
         onEnrollFree={handleEnrollFree}
         paying={paying}
         enrolling={enrolling}
+        preview={preview}
+        previewLoading={previewLoading}
       />
     );
   };

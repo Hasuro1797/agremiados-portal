@@ -6,8 +6,10 @@ export const MY_NOTIFICATIONS = gql`
       notifications {
         id
         userId
+        triggerKey
         subject
         body
+        link
         channel
         status
         readAt

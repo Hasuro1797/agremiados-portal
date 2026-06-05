@@ -1,45 +1,29 @@
 "use client";
 import apolloClient from "@/graphql/apollo.client";
 
-import { cn, formatDate } from "@/lib/utils";
 import { useMutation } from "@apollo/client";
-import { Bell } from "lucide-react";
+import { Bell, CheckCheck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import NotificationRow from "@/components/notifications/NotificationRow";
+import {
+  type NotificationsData,
+} from "@/components/notifications/notification-utils";
 import { MY_NOTIFICATIONS } from "@/graphql/query/notification.query";
 import {
   MARK_ALL_NOTIFICATIONS_READ,
   MARK_NOTIFICATION_READ,
 } from "@/graphql/mutation/notification.mutation";
-
-interface NotificationItem {
-  id: number;
-  userId: string;
-  subject: string;
-  body: string;
-  channel: string;
-  status: string; // "PENDING" | "SENT" | "FAILED" | "READ"
-  readAt?: string;
-  createdAt: string;
-}
-
-interface NotificationsData {
-  notifications: NotificationItem[];
-  total: number;
-  unreadCount: number;
-}
+import { routes } from "@/lib/routes";
 
 const POLL_INTERVAL_MS = 60_000;
-
-const isRead = (n: NotificationItem) => n.status === "READ";
 
 export default function NotificationBell() {
   const [data, setData] = useState<NotificationsData | null>(null);
@@ -68,32 +52,43 @@ export default function NotificationBell() {
   const [markAllRead] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
 
   const handleMarkRead = async (id: number) => {
-    await markRead({ variables: { id } });
-    setData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        unreadCount: Math.max(0, prev.unreadCount - 1),
-        notifications: prev.notifications.map((n) =>
-          n.id === id ? { ...n, status: "READ" } : n,
-        ),
-      };
-    });
+    // optimistic update
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            unreadCount: Math.max(0, prev.unreadCount - 1),
+            notifications: prev.notifications.map((n) =>
+              n.id === id ? { ...n, status: "READ" } : n,
+            ),
+          }
+        : prev,
+    );
+    try {
+      await markRead({ variables: { id } });
+    } catch {
+      fetchNotifications();
+    }
   };
 
   const handleMarkAllRead = async () => {
-    await markAllRead();
-    setData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        unreadCount: 0,
-        notifications: prev.notifications.map((n) => ({
-          ...n,
-          status: "READ",
-        })),
-      };
-    });
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            unreadCount: 0,
+            notifications: prev.notifications.map((n) => ({
+              ...n,
+              status: "READ",
+            })),
+          }
+        : prev,
+    );
+    try {
+      await markAllRead();
+    } catch {
+      fetchNotifications();
+    }
   };
 
   const unreadCount = data?.unreadCount ?? 0;
@@ -105,78 +100,71 @@ export default function NotificationBell() {
         <Button variant="ghost" size="icon" className="relative h-9 w-9">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
+            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white leading-none">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-[min(24rem,calc(100vw-1rem))] p-0 overflow-hidden rounded-2xl shadow-lg"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <span className="text-sm font-semibold">Notificaciones</span>
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-white">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900">
+              Notificaciones
+            </span>
+            {unreadCount > 0 && (
+              <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                {unreadCount}
+              </span>
+            )}
+          </div>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs text-muted-foreground hover:text-foreground px-2"
+              className="h-7 gap-1.5 px-2 text-xs text-primary hover:bg-primary/5"
               onClick={handleMarkAllRead}
             >
+              <CheckCheck className="size-3.5" />
               Marcar todas leídas
             </Button>
           )}
         </div>
 
         {/* Notification list */}
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="h-[min(26rem,60vh)]">
           {notifications.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              No hay notificaciones
+            <div className="flex flex-col items-center gap-2 py-12 text-center">
+              <span className="flex size-12 items-center justify-center rounded-full bg-gray-50">
+                <Bell className="size-5 text-gray-300" />
+              </span>
+              <p className="text-sm text-gray-500">No hay notificaciones</p>
             </div>
           ) : (
-            <div className="divide-y">
+            <div className="divide-y divide-gray-100">
               {notifications.map((notif) => (
-                <button
+                <NotificationRow
                   key={notif.id}
-                  className={cn(
-                    "w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors",
-                    !isRead(notif) && "bg-blue-50/50 dark:bg-blue-950/10",
-                  )}
-                  onClick={() => {
-                    if (!isRead(notif)) handleMarkRead(notif.id);
-                  }}
-                >
-                  <div className="flex items-start gap-2">
-                    {!isRead(notif) && (
-                      <span className="mt-1.5 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-                    )}
-                    <div
-                      className={cn("flex-1 min-w-0", isRead(notif) && "ml-4")}
-                    >
-                      <p className="text-sm font-medium truncate">
-                        {notif.subject}
-                      </p>
-                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                        {notif.body}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        {formatDate(notif.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </button>
+                  notification={notif}
+                  compact
+                  onRead={handleMarkRead}
+                  onBeforeNavigate={() => setOpen(false)}
+                />
               ))}
             </div>
           )}
         </ScrollArea>
 
-        <DropdownMenuSeparator />
-
         {/* Footer */}
-        <div className="px-4 py-2">
+        <div className="border-t bg-white p-2">
           <Link
-            href="/admin/notificaciones"
-            className="text-xs text-center block text-muted-foreground hover:text-foreground transition-colors py-1"
+            href={routes.myNotifications}
+            className="block w-full rounded-lg py-2 text-center text-sm font-medium text-primary transition-colors hover:bg-primary/5"
             onClick={() => setOpen(false)}
           >
             Ver todas las notificaciones

@@ -27,6 +27,9 @@ let refreshPromise: Promise<void> | null = null;
 //CONFIGURATION HHTP LINK
 const httpLink = createUploadLink({
   uri: `${GRAHQL_URL}/graphql`,
+  headers: {
+    "apollo-require-preflight": "true",
+  },
 });
 
 export const refreshAccessTokenReq = async () => {

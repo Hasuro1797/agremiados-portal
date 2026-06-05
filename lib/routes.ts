@@ -10,6 +10,7 @@ export const routes = {
   public: {
     termsAndConditions: "/terms-and-conditions",
     privacyPolicy: "/privacy-policy",
+    verifyCertificate: (code: string) => `/verificar/${code}`,
   },
   privates: {
     updateData: "/update-data",
@@ -44,6 +45,14 @@ export const routes = {
     detail: (id: number | string) => `/espacios/${id}`,
   },
   myReservations: "/mis-reservas",
+  myPayments: "/mis-pagos",
+  myNotifications: "/mis-notificaciones",
+  support: {
+    home: "/soporte",
+    new: "/soporte/nuevo",
+    detail: (id: number | string) => `/soporte/${id}`,
+  },
+  habilitationCertificate: "/constancia",
 };
 
 export const publicAuthRoutes = [
@@ -75,4 +84,10 @@ export const privateRoutes = [
   routes.surveys.detail(":id"),
   routes.communications.detail(":id"),
   routes.news.detail(":id"),
+  routes.myPayments,
+  routes.myNotifications,
+  routes.support.home,
+  routes.support.new,
+  routes.support.detail(":id"),
+  routes.habilitationCertificate,
 ];

@@ -8,7 +8,7 @@ import { useOrganization } from "@/providers/organization-provider";
 import { useUserStore } from "@/providers/user-provider";
 import { UserStatus } from "@/utils/enum";
 import { useQuery } from "@apollo/client";
-import { CreditCard, FileText } from "lucide-react";
+import { CreditCard, FileText, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import MiniCalendar from "./MiniCalendar";
 import { get } from "lodash";
@@ -140,6 +140,16 @@ export default function UserSidebar() {
                 </Link>
               </Button>
             )}
+            <Button
+              asChild
+              variant="outline"
+              className="w-full border-primary/20 text-primary hover:bg-primary/5 h-10 text-sm gap-2"
+            >
+              <Link href={routes.myPayments}>
+                <ReceiptText className="size-4" />
+                Mis pagos
+              </Link>
+            </Button>
             <Button
               asChild
               variant="outline"

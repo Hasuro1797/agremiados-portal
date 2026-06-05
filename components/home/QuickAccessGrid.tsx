@@ -9,7 +9,10 @@ import {
   CalendarDays,
   CreditCard,
   Handshake,
+  LifeBuoy,
   Megaphone,
+  ReceiptText,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -87,6 +90,36 @@ export default function QuickAccessGrid() {
       bgClass: "bg-rose-50",
       accentClass: "group-hover:bg-rose-50/50 group-hover:border-rose-200",
       show: !!organization?.modulePosts,
+    },
+    {
+      label: "Mis pagos",
+      description: "Historial de comprobantes y descarga de boletas",
+      icon: ReceiptText,
+      href: routes.myPayments,
+      iconClass: "text-emerald-600",
+      bgClass: "bg-emerald-50",
+      accentClass: "group-hover:bg-emerald-50/50 group-hover:border-emerald-200",
+      show: true,
+    },
+    {
+      label: "Constancia",
+      description: "Genera y descarga tu constancia de habilitación",
+      icon: ShieldCheck,
+      href: routes.habilitationCertificate,
+      iconClass: "text-sky-600",
+      bgClass: "bg-sky-50",
+      accentClass: "group-hover:bg-sky-50/50 group-hover:border-sky-200",
+      show: true,
+    },
+    {
+      label: "Soporte",
+      description: "Abre un reclamo o revisa el estado de los anteriores",
+      icon: LifeBuoy,
+      href: routes.support.home,
+      iconClass: "text-orange-600",
+      bgClass: "bg-orange-50",
+      accentClass: "group-hover:bg-orange-50/50 group-hover:border-orange-200",
+      show: true,
     },
   ].filter((item) => item.show);
 
